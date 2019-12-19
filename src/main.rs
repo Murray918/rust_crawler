@@ -12,10 +12,18 @@ use html5ever::tokenizer::{
 
 use std::borrow::Borrow;
 
+use async_std::task;
+
 use url::{
     ParseError, 
     Url,
 };
+
+type CrawlResult = Result<(), Box<dyn std::error::Error + Send + Sync + 'static>>;
+
+type BoxFuture = std::pin::Pin<Box<dyn  std::future::Future<Output=CrawlResult> + Send>>;
+
+
 
 #[derive(Default, Debug)]
 struct LinkQueue {
@@ -82,10 +90,42 @@ pub fn get_links(url: &Url, page: String) -> Vec<Url> {
             //return the link into links
             Ok(url) => url
         }) 
-    .collect()
-
+    .collect() // collect our info
 }   
 
+async fn crawl (pages : Vec<Url>, current: u8, max: u8 ) -> CrawlResult {
+    println!("Current Depth: {}, Max Depth: {}", current, max);
+
+    if current > max {
+        println!("Reached Max Depth");
+        return Ok(());
+    }
+    
+    let mut tasks = vec![]
+    
+    println!("crawling: {:?}", pages);
+
+    for url in pages {
+        let task = task::spawn(async move {
+            println!("Getting : {}", url);
+
+            let mut res = surf::get(&url).await?;
+            let body = res.body_string().await?;
+
+            let links = get_links(&url, body);
+            
+            println!("Following: {:?}", links);
+        });
+
+        tasks.push(task)
+    }
+
+    for task in tasks.into_iter() {
+        task.await?;
+    }
+
+    Ok(())
+}
 
 fn main() {
     println!("Hello, world!");
