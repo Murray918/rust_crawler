@@ -61,10 +61,13 @@ pub fn get_links(url: &Url, page: String) -> Vec<Url> {
     domain_url.set_path("");
     domain_url.set_query(None);
 
-    let mut queue = LinkQueue::default(); // 0 out the links vector
+    // 0 out the links vector
+    let mut queue = LinkQueue::default(); 
     //identify tokens in the html page
     let mut tokenizer = Tokenizer::new(&mut queue, TokenizerOpts::default());
-    let mut buffer = BufferQueue::new(); //reading through the characters of our html page
+    //reading through the characters of our html page
+    let mut buffer = BufferQueue::new(); 
+
     buffer.push_back(page.into());
     let _ = tokenizer.feed(&mut buffer);
 
@@ -72,8 +75,11 @@ pub fn get_links(url: &Url, page: String) -> Vec<Url> {
         .links
         .iter()
         .map(|link| match Url::parse(link){
+            //if the url is relative join it with the domain clone it an push it in to the links
             Err(ParseError::RelativeUrlWithoutBase) => domain_url.join(link).unwrap(),
+            //if it is not a link panic
             Err(_) => panic!("Malformed Link found {}", link),
+            //return the link into links
             Ok(url) => url
         }) 
     .collect()
