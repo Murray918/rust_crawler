@@ -1,33 +1,46 @@
 use html5ever::tokenizer::{
-    BufferQueue, Tag, TagKind, TagToken, Token, TokenSink, TokenSinkResult, Tokenizer,
+    BufferQueue, 
+    Tag, 
+    TagKind, 
+    TagToken, 
+    Token, 
+    TokenSink, 
+    TokenSinkResult, 
+    Tokenizer,
     TokenizerOpts,
 };
-
 use std::borrow::Borrow;
 
-use async_std::task;
+use url::{
+    ParseError, 
+    Url
+};
 
-use url::{ParseError, Url};
+use async_std::task;
+use surf;
 
 type CrawlResult = Result<(), Box<dyn std::error::Error + Send + Sync + 'static>>;
 
 type BoxFuture = std::pin::Pin<Box<dyn std::future::Future<Output = CrawlResult> + Send>>;
 
 #[derive(Default, Debug)]
-struct LinkQueue {
+struct LinkQueue { // struct for the links
     links: Vec<String>,
 }
+
 
 impl TokenSink for &mut LinkQueue {
     type Handle = ();
 
+    /**
+     * Look for html a tag
+     * here is an a example
+     * <a href="link">some text</a>
+     * */ 
     fn process_token(&mut self, token: Token, line_number: u64) -> TokenSinkResult<Self::Handle> {
         match token {
             TagToken(
-                ref
-                tag
-                @
-                Tag {
+                ref tag @ Tag {
                     kind: TagKind::StartTag,
                     ..
                 },
@@ -42,6 +55,7 @@ impl TokenSink for &mut LinkQueue {
                     }
                 }
             }
+
             _ => {}
         }
         TokenSinkResult::Continue
@@ -53,13 +67,9 @@ pub fn get_links(url: &Url, page: String) -> Vec<Url> {
     domain_url.set_path("");
     domain_url.set_query(None);
 
-    // 0 out the links vector
     let mut queue = LinkQueue::default();
-    //identify tokens in the html page
     let mut tokenizer = Tokenizer::new(&mut queue, TokenizerOpts::default());
-    //reading through the characters of our html page
     let mut buffer = BufferQueue::new();
-
     buffer.push_back(page.into());
     let _ = tokenizer.feed(&mut buffer);
 
@@ -67,14 +77,11 @@ pub fn get_links(url: &Url, page: String) -> Vec<Url> {
         .links
         .iter()
         .map(|link| match Url::parse(link) {
-            //if the url is relative join it with the domain clone it an push it in to the links
             Err(ParseError::RelativeUrlWithoutBase) => domain_url.join(link).unwrap(),
-            //if it is not a link panic
-            Err(_) => panic!("Malformed Link found {}", link),
-            //return the link into links
+            Err(_) => panic!("Malformed link found: {}", link),
             Ok(url) => url,
         })
-        .collect() // collect our info
+        .collect()
 }
 
 fn box_crawl(pages: Vec<Url>, current: u8, max: u8) -> BoxFuture {
@@ -88,7 +95,9 @@ async fn crawl(pages: Vec<Url>, current: u8, max: u8) -> CrawlResult {
         println!("Reached Max Depth");
         return Ok(());
     }
+
     let mut tasks = vec![];
+
     println!("crawling: {:?}", pages);
 
     for url in pages {
@@ -114,8 +123,7 @@ async fn crawl(pages: Vec<Url>, current: u8, max: u8) -> CrawlResult {
 }
 
 fn main() -> CrawlResult {
-    
-    task::block_on(async { //block the current thread until the async task is done
-        box_crawl(vec![Url::parse("http://www.rust-lang.org").unwrap()], 1, 2 ).await
+    task::block_on(async {
+        box_crawl(vec![Url::parse("https://www.rust-lang.org").unwrap()], 1, 2).await
     })
 }
