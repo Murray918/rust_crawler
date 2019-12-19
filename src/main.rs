@@ -17,6 +17,10 @@ use url::{
     Url,
 };
 
+#[derive(Default, Debug)]
+struct LinkQueue {
+    links : Vec<String>,
+
 
 fn main() {
     println!("Hello, world!");
